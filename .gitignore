@@ -1,0 +1,24 @@
+# Build output
+build/
+out/
+cmake-build-*/
+
+# Object/binary files
+*.o
+*.obj
+*.exe
+*.out
+*.a
+*.so
+*.dylib
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# Editor/OS
+.DS_Store
+*.swp
