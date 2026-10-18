@@ -25,11 +25,15 @@ nvcc -O3 -std=c++17 -arch=$ARCH \
     -o build/nbody_cuda
 
 echo "Building nbody_render (CUDA-OpenGL interop renderer)..."
+# Link GLVND's libOpenGL.so, not legacy Mesa libGL.so: this renderer loads
+# GL >=3.2 entry points via eglGetProcAddress (the GLVND model), and on a
+# box with the NVIDIA driver installed, Mesa's libGL.so can be ABI-mismatched
+# against the GLVND dispatch libraries actually present at link/run time.
 nvcc -O3 -std=c++17 -arch=$ARCH \
     -Iinclude \
     src/render_main.cu src/bruteforce.cu src/barnes_hut.cu src/scenarios.cpp src/interop.cu \
     src/egl_context.cpp src/gl_compat.cpp src/ppm.cpp \
-    -lEGL -lGL \
+    -lEGL -lOpenGL \
     -o build/nbody_render
 
 echo "Built build/nbody_cuda and build/nbody_render"
