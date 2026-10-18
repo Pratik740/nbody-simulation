@@ -38,6 +38,13 @@ bool EglContext::init(int width, int height) {
         std::vector<EGLDeviceEXT> devices(numDevices);
         queryDevices(numDevices, devices.data(), &numDevices);
 
+        std::fprintf(stderr, "eglQueryDevicesEXT found %d device(s); queryDeviceString=%p\n", numDevices,
+                     (void*)queryDeviceString);
+        for (EGLint i = 0; i < numDevices; ++i) {
+            const char* exts = queryDeviceString ? queryDeviceString(devices[i], EGL_EXTENSIONS) : nullptr;
+            std::fprintf(stderr, "  device[%d] extensions: %s\n", i, exts ? exts : "(null)");
+        }
+
         // Boxes with both the NVIDIA driver and Mesa installed can expose
         // more than one EGL device (a real NVIDIA one plus Mesa's software
         // llvmpipe one), and devices[0] isn't guaranteed to be the NVIDIA
