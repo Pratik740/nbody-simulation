@@ -26,31 +26,22 @@ nvcc -O3 -std=c++17 -arch=$ARCH \
 
 echo "Building nbody_render (CUDA-OpenGL interop renderer)..."
 # Link GLVND's libOpenGL.so, not legacy Mesa libGL.so: this renderer loads
-# GL >=3.2 entry points via eglGetProcAddress (the GLVND model). Either one
-# transitively needs Mesa's libglapi.so (it defines _glapi_tls_Current), but
-# the linker doesn't always pull that dependency in automatically. There's
-# no libglapi-dev package providing an unversioned libglapi.so symlink for
-# -lglapi to find, so resolve the actual runtime .so via ldconfig and pass
-# its path straight to the linker.
-# Note the `|| true`: grep exits 1 (not an error, just "no match") when
-# ldconfig's cache doesn't list libglapi.so, and with pipefail that would
-# otherwise kill the whole script right here, silently, before the
-# diagnostic below ever runs.
-GLAPI_LIB=$(ldconfig -p | grep 'libglapi\.so' | awk '{print $NF}' | head -n1 || true)
-if [ -z "$GLAPI_LIB" ]; then
-    echo "libglapi.so not found via ldconfig -p; falling back to a direct filesystem search" >&2
-    GLAPI_LIB=$(find /usr/lib /lib -name 'libglapi.so*' 2>/dev/null | head -n1 || true)
+# GL >=3.2 entry points via eglGetProcAddress (the GLVND model). On boxes
+# with the NVIDIA driver installed (e.g. Colab's /usr/lib64-nvidia), NVIDIA
+# ships its own complete, self-contained copies of libOpenGL.so/libGL.so
+# that don't depend on Mesa's libglapi.so at all. Mesa's copies at the
+# standard multiarch path do need it, and chasing that dependency down is
+# more fragile than just preferring NVIDIA's own libraries when present --
+# point the linker there first via -L so it picks those instead.
+NVIDIA_LIBDIR_FLAG=""
+if [ -d /usr/lib64-nvidia ]; then
+    NVIDIA_LIBDIR_FLAG="-L/usr/lib64-nvidia"
 fi
-if [ -z "$GLAPI_LIB" ]; then
-    echo "libglapi.so.* not found -- is libgl1-mesa-dev installed?" >&2
-    exit 1
-fi
-echo "Using libglapi: $GLAPI_LIB"
 nvcc -O3 -std=c++17 -arch=$ARCH \
     -Iinclude \
     src/render_main.cu src/bruteforce.cu src/barnes_hut.cu src/scenarios.cpp src/interop.cu \
     src/egl_context.cpp src/gl_compat.cpp src/ppm.cpp \
-    -lEGL -lOpenGL "$GLAPI_LIB" \
+    $NVIDIA_LIBDIR_FLAG -lEGL -lOpenGL \
     -o build/nbody_render
 
 echo "Built build/nbody_cuda and build/nbody_render"
