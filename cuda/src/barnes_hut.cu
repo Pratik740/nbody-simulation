@@ -350,7 +350,8 @@ void computeAccelerationsBarnesHut(const BodiesSoA& d_bodies, float* d_ax, float
     cudaFree(d_cellCounter);
 }
 
-void runBarnesHutSimulation(BodiesSoA& d_bodies, int steps, float dt, float theta) {
+void runBarnesHutSimulation(BodiesSoA& d_bodies, int steps, float dt, float theta, StepCallback perStepCallback,
+                             void* user) {
     int n = d_bodies.n;
     size_t bytes = static_cast<size_t>(n) * sizeof(float);
     float theta2 = theta * theta;
@@ -378,6 +379,8 @@ void runBarnesHutSimulation(BodiesSoA& d_bodies, int steps, float dt, float thet
 
         updateVelocitiesKernel<<<grid, kBlockSize>>>(d_bodies, axOld, ayOld, azOld, axNew, ayNew, azNew, dt);
         CUDA_CHECK(cudaGetLastError());
+
+        if (perStepCallback) perStepCallback(d_bodies, step, user);
 
         float *tx = axOld, *ty = ayOld, *tz = azOld;
         axOld = axNew; ayOld = ayNew; azOld = azNew;
