@@ -32,11 +32,20 @@ echo "Building nbody_render (CUDA-OpenGL interop renderer)..."
 # no libglapi-dev package providing an unversioned libglapi.so symlink for
 # -lglapi to find, so resolve the actual runtime .so via ldconfig and pass
 # its path straight to the linker.
-GLAPI_LIB=$(ldconfig -p | grep 'libglapi\.so' | awk '{print $NF}' | head -n1)
+# Note the `|| true`: grep exits 1 (not an error, just "no match") when
+# ldconfig's cache doesn't list libglapi.so, and with pipefail that would
+# otherwise kill the whole script right here, silently, before the
+# diagnostic below ever runs.
+GLAPI_LIB=$(ldconfig -p | grep 'libglapi\.so' | awk '{print $NF}' | head -n1 || true)
 if [ -z "$GLAPI_LIB" ]; then
-    echo "libglapi.so.* not found via ldconfig -- is libgl1-mesa-dev installed?" >&2
+    echo "libglapi.so not found via ldconfig -p; falling back to a direct filesystem search" >&2
+    GLAPI_LIB=$(find /usr/lib /lib -name 'libglapi.so*' 2>/dev/null | head -n1 || true)
+fi
+if [ -z "$GLAPI_LIB" ]; then
+    echo "libglapi.so.* not found -- is libgl1-mesa-dev installed?" >&2
     exit 1
 fi
+echo "Using libglapi: $GLAPI_LIB"
 nvcc -O3 -std=c++17 -arch=$ARCH \
     -Iinclude \
     src/render_main.cu src/bruteforce.cu src/barnes_hut.cu src/scenarios.cpp src/interop.cu \
