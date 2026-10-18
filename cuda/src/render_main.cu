@@ -188,7 +188,7 @@ void renderFrame(const BodiesSoA& d_bodies, int step, void* userPtr) {
     copyPositionsToVBO(d_bodies, devPtr);
     CUDA_CHECK(cudaGraphicsUnmapResources(1, &s->cudaVbo, 0));
 
-    glBindFramebuffer(GL_FRAMEBUFFER, s->fbo);
+    gl.BindFramebuffer(GL_FRAMEBUFFER, s->fbo);
     glViewport(0, 0, s->width, s->height);
     glClearColor(0.02f, 0.02f, 0.05f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
