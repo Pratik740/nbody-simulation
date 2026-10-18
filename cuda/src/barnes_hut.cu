@@ -117,7 +117,13 @@ __global__ void buildTreeKernel(BodiesSoA bodies, CellArrays cells, int* cellCou
         int j = octantOf(bx, by, bz, cx, cy, cz);
         int c = current - n;
         int* slotPtr = &cells.child[c * 8 + j];
-        int ch = *slotPtr;
+        // volatile: the "ch == -2" spin below has no atomic op in it, so
+        // without forcing a real reload here the compiler can treat this
+        // load as loop-invariant and cache it, leaving a spinning thread
+        // stuck rereading a stale value and never seeing another thread's
+        // fenced publish -- a real, reproducible hang at higher body counts
+        // (the 3-way-collision case is rare at n=3, common at n=500+).
+        int ch = *(volatile int*)slotPtr;
 
         if (ch >= n) {
             current = ch;
