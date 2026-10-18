@@ -237,6 +237,8 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "Failed to load required OpenGL entry points\n");
         return 1;
     }
+    std::fprintf(stderr, "GL_VENDOR=%s GL_RENDERER=%s GL_VERSION=%s\n", glGetString(GL_VENDOR),
+                 glGetString(GL_RENDERER), glGetString(GL_VERSION));
 
     RenderState state;
     state.width = args.width; state.height = args.height;
