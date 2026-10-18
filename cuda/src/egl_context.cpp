@@ -3,11 +3,13 @@
 #include <EGL/eglext.h>
 
 #include <cstdio>
+#include <cstring>
 #include <vector>
 
 namespace {
 typedef EGLBoolean (*PFNEGLQUERYDEVICESEXTPROC_)(EGLint, EGLDeviceEXT*, EGLint*);
 typedef EGLDisplay (*PFNEGLGETPLATFORMDISPLAYEXTPROC_)(EGLenum, void*, const EGLint*);
+typedef const char* (*PFNEGLQUERYDEVICESTRINGEXTPROC_)(EGLDeviceEXT, EGLint);
 }  // namespace
 
 bool EglContext::init(int width, int height) {
@@ -19,6 +21,8 @@ bool EglContext::init(int width, int height) {
         reinterpret_cast<PFNEGLQUERYDEVICESEXTPROC_>(eglGetProcAddress("eglQueryDevicesEXT"));
     auto getPlatformDisplay =
         reinterpret_cast<PFNEGLGETPLATFORMDISPLAYEXTPROC_>(eglGetProcAddress("eglGetPlatformDisplayEXT"));
+    auto queryDeviceString =
+        reinterpret_cast<PFNEGLQUERYDEVICESTRINGEXTPROC_>(eglGetProcAddress("eglQueryDeviceStringEXT"));
 
     if (!queryDevices || !getPlatformDisplay) {
         std::fprintf(stderr,
@@ -33,7 +37,25 @@ bool EglContext::init(int width, int height) {
         }
         std::vector<EGLDeviceEXT> devices(numDevices);
         queryDevices(numDevices, devices.data(), &numDevices);
-        display = getPlatformDisplay(EGL_PLATFORM_DEVICE_EXT, devices[0], nullptr);
+
+        // Boxes with both the NVIDIA driver and Mesa installed can expose
+        // more than one EGL device (a real NVIDIA one plus Mesa's software
+        // llvmpipe one), and devices[0] isn't guaranteed to be the NVIDIA
+        // one -- picking the wrong one silently gives a CPU-rendered
+        // context that CUDA-OpenGL interop can't register a buffer against.
+        // EGL_NV_device_cuda is only advertised by the real CUDA-capable
+        // NVIDIA device, so prefer whichever device has it.
+        EGLDeviceEXT chosen = devices[0];
+        if (queryDeviceString) {
+            for (EGLint i = 0; i < numDevices; ++i) {
+                const char* exts = queryDeviceString(devices[i], EGL_EXTENSIONS);
+                if (exts && std::strstr(exts, "EGL_NV_device_cuda")) {
+                    chosen = devices[i];
+                    break;
+                }
+            }
+        }
+        display = getPlatformDisplay(EGL_PLATFORM_DEVICE_EXT, chosen, nullptr);
     }
 
     if (display == EGL_NO_DISPLAY) {
